@@ -31,9 +31,13 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python VMTranslator.py [file.vm|folder]")
     else:
-        input = sys.argv[1].split(".")[0]
-        vmTranslator = VMTranslator(input)
+        folder_dir = os.path.dirname(sys.argv[1])
+        file_name = os.path.basename(sys.argv[1])
+        print(sys.argv[1])
+        print(folder_dir)
+        print(file_name)
         if os.path.isdir(sys.argv[1]):
+            vmTranslator = VMTranslator(sys.argv[1] + "/" + file_name + ".asm")
             files = os.listdir(sys.argv[1])
             # Sys must be translated first
             if "Sys.vm" in files:
@@ -48,6 +52,7 @@ if __name__ == "__main__":
                     vmTranslator.codeWriter.setFileName(file)
                     vmTranslator.translate()
         else:
+            vmTranslator = VMTranslator(folder_dir + "/" + file_name.replace(".vm", ".asm"))
             vmTranslator.parser = Parser.Parser(sys.argv[1])
             vmTranslator.translate()
         vmTranslator.codeWriter.close()

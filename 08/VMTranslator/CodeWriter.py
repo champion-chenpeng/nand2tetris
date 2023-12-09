@@ -1,6 +1,6 @@
 class CodeWriter:
     def __init__(self, file):
-        file = file + ".asm"
+        file = file
         self.writter = open(file, "w")
         
         self.dict_RAM = {"local": "LCL", "argument": "ARG", "this": "THIS", "that": "THAT", "temp": "R5", "pointer": "THIS"}
@@ -10,8 +10,7 @@ class CodeWriter:
         self.list_compare = ["eq", "gt", "lt"]
         self.NCompare= 0
 
-        self.RET = "R14"
-        self.savedFrame = [self.RET, "LCL", "ARG", "THIS", "THAT"] # RET is virtual savedFrame, indeed is in temp R14
+        self.savedFrame = ["LCL", "ARG", "THIS", "THAT"]
 
         self.currentFile = ""
         self.callerFunction = "" # in file.function format
@@ -43,10 +42,10 @@ class CodeWriter:
         self.endLoop()
         self.writter.close()
 
-    def writePushX(self, X):
+    def writePushD(self):
         self.writter.write("@SP\n")
         self.writter.write("A=M\n")
-        self.writter.write("M=" + X + "\n")
+        self.writter.write("M=D\n")
         self.writter.write("@SP\n")
         self.writter.write("M=M+1\n")
 
@@ -78,7 +77,7 @@ class CodeWriter:
             self.AddressI(arg1, arg2) # D is messed up
             if arg1 != "constant":
                 self.writter.write("D=M\n") # D reclared
-            self.writePushX("D") # A is messed up
+            self.writePushD() # A is messed up
         elif commandType == "C_POP":
             self.AddressI(arg1, arg2)
             # store A in R13
@@ -123,7 +122,7 @@ class CodeWriter:
     def writeArithmetic(self, command):
         self.writeGetArgs(command) # D = y, M = x
         self.writeArithmeticD(command) # D = x op y
-        self.writePushX("D")
+        self.writePushD()
 
     def writeLabel(self, label):
         self.writter.write("(" + self.callerFunction + "$" + label + ")\n")
@@ -140,7 +139,7 @@ class CodeWriter:
     def writeSavedFrame(self, name):
         self.writter.write("@" + name + "\n")
         self.writter.write("D=M\n")
-        self.writePushX("D")
+        self.writePushD()
     
     def writeRestoreFrame(self, FRAME, index):
         self.writter.write("@" + str(index) + "\n")
@@ -158,9 +157,9 @@ class CodeWriter:
         # push returnAddress
         self.writter.write("@" + returnAddress + "\n")
         self.writter.write("D=A\n")
-        self.writePushX("D")
+        self.writePushD()
         # push saevdFrame
-        for name in self.savedFrame[1:]: # exclude RET
+        for name in self.savedFrame:
             self.writeSavedFrame(name)
         # ARG = SP-n-5
         self.writter.write("@SP\n")
@@ -189,6 +188,13 @@ class CodeWriter:
         self.writter.write("D=M\n")
         self.writter.write("@" + FRAME + "\n")
         self.writter.write("M=D\n")
+        # *RET = *(*FRAME-5)
+        RET = "R14"
+        self.writter.write("@5\n")
+        self.writter.write("A=D-A\n")
+        self.writter.write("D=M\n")
+        self.writter.write("@" + RET + "\n")
+        self.writter.write("M=D\n")
         # **ARG = pop(), return value
         self.writePopD()
         self.writter.write("@ARG\n")
@@ -202,9 +208,8 @@ class CodeWriter:
         # write restore frame
         for i in range(1, len(self.savedFrame)+1):
             self.writeRestoreFrame(FRAME, i)
-        
         # goto RET
-        self.writter.write("@" + self.RET + "\n")
+        self.writter.write("@" + RET + "\n")
         self.writter.write("A=M\n")
         self.writter.write("0;JMP\n")
     
@@ -212,8 +217,11 @@ class CodeWriter:
         self.callerFunction = functionName
         self.Nret = 0
         self.writter.write("(" + self.callerFunction + ")\n")
-        # init local with 0
         for i in range(int(numLocals)):
-            self.writePushX("0")
+            self.writter.write("@SP\n")
+            self.writter.write("A=M\n")
+            self.writter.write("M=0\n")
+            self.writter.write("@SP\n")
+            self.writter.write("M=M+1\n")
     
 
