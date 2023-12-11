@@ -4,43 +4,59 @@ class CompilationEngine:
         self.tokenizer = JackTokenizer.JackTokenizer(input_file)
         self.output_file = open(output_file, "w") 
         self.indentation = 0
+        self.index = {"static": 0, "field": 0, "arg": 0, "local": 0}
+        self.symbolTable = {}
         self.compileClass()
         self.close()
+    def close(self):
+        self.output_file.close()
     
+    def compileVarDec(self, isParameter=False):
+        globalType = "arg" if isParameter else self.tokenizer.keyword() # static or field or var
+        tag = "varDec" if globalType == "var" else "classVarDec"
+        if isParameter:
+            tag = "parameterList"
+
+        self.writeTag(tag)
+        self.indentation += 1
+        if not isParameter:
+            self.writeKeyword(globalType)
+        if self.tokenizer.tokenType() == "KEYWORD": # exclude parameter list void case, following ")"
+            self.compileType()
+            self.writeIdentifier(self.tokenizer.identifier(), globalType, self.index[globalType], "declared") # class variable name, index is important, usage is important
+            self.index[globalType] += 1
+            while self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ",":
+                self.writeSymbol(",")
+                if isParameter: # not empty parameter list, if empty, next token is ")", a symbol
+                    self.compileType()
+                self.writeIdentifier(self.tokenizer.identifier(), globalType, self.index[globalType], "declared")
+                self.index[globalType] += 1
+        if not isParameter:
+            self.writeSymbol(";")
+        self.indentation -= 1
+        self.writeTag("/" + tag)
+        
     def compileClass(self):
         self.writeTag("class")
         self.indentation += 1
         self.writeKeyword("class")
         self.tokenizer.advance()
 
-        self.writeIdentifier(self.tokenizer.identifier())
+        self.writeIdentifier(self.tokenizer.identifier(), "class", 0, "declared") # class name, since only one class per file, index or usage is not important
         self.writeSymbol("{")
         while self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["static", "field"]:
-            self.compileClassVarDec()
+            self.compileVarDec()
         while self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["constructor", "function", "method"]:
             self.compileSubroutine()
         self.writeSymbol("}")
         self.indentation -= 1
         self.writeTag("/class")
-
-    def compileClassVarDec(self):
-        self.writeTag("classVarDec")
-        self.indentation += 1
-        self.writeKeyword(self.tokenizer.keyword())
-        self.compileType()
-        self.writeIdentifier(self.tokenizer.identifier())
-        while self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ",":
-            self.writeSymbol(",")
-            self.writeIdentifier(self.tokenizer.identifier())
-        self.writeSymbol(";")
-        self.indentation -= 1
-        self.writeTag("/classVarDec")
     
     def compileType(self):
-        if self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["int", "char", "boolean"]:
+        if self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["int", "char", "boolean"]: # basic type
             self.writeKeyword(self.tokenizer.keyword())
-        elif self.tokenizer.tokenType() == "IDENTIFIER":
-            self.writeIdentifier(self.tokenizer.identifier())
+        elif self.tokenizer.tokenType() == "IDENTIFIER": # user-defined type
+            self.writeIdentifier(self.tokenizer.identifier(), "class", 0, "used") # here a instance of class is used
         else:
             raise Exception("Error: invalid type")
         
@@ -52,27 +68,14 @@ class CompilationEngine:
             self.writeKeyword("void")
         else:
             self.compileType()
-        self.writeIdentifier(self.tokenizer.identifier())
+        self.writeIdentifier(self.tokenizer.identifier(), "subroutine", 0, "declared") # subroutine name, index is important, usage is important
         self.writeSymbol("(")
-        self.compileParameterList()
+        self.compileVarDec(isParameter=True)
         self.writeSymbol(")")
         self.compileSubroutineBody()
         self.indentation -= 1
         self.writeTag("/subroutineDec")
-    
-    def compileParameterList(self):
-        self.writeTag("parameterList")
-        self.indentation += 1
-        if self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["int", "char", "boolean"]:
-            self.compileType()
-            self.writeIdentifier(self.tokenizer.identifier())
-            while self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ",":
-                self.writeSymbol(",")
-                self.compileType()
-                self.writeIdentifier(self.tokenizer.identifier())
-        self.indentation -= 1
-        self.writeTag("/parameterList")
-
+        
     def compileSubroutineBody(self):
         self.writeTag("subroutineBody")
         self.indentation += 1
@@ -83,19 +86,6 @@ class CompilationEngine:
         self.writeSymbol("}")
         self.indentation -= 1
         self.writeTag("/subroutineBody")
-
-    def compileVarDec(self):
-        self.writeTag("varDec")
-        self.indentation += 1
-        self.writeKeyword("var")
-        self.compileType()
-        self.writeIdentifier(self.tokenizer.identifier())
-        while self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ",":
-            self.writeSymbol(",")
-            self.writeIdentifier(self.tokenizer.identifier())
-        self.writeSymbol(";")
-        self.indentation -= 1
-        self.writeTag("/varDec")
     
     def compileStatements(self):
         self.writeTag("statements")
@@ -118,7 +108,7 @@ class CompilationEngine:
         self.writeTag("doStatement")
         self.indentation += 1
         self.writeKeyword("do")
-        self.writeIdentifier(self.tokenizer.identifier())
+        self.writeIdentifier(self.tokenizer.identifier(), "subroutine", 0, "used") # subroutine name, index is important, usage is important
         self.compileSubroutineCall()
         self.writeSymbol(";")
         self.indentation -= 1
@@ -128,7 +118,7 @@ class CompilationEngine:
         self.writeTag("letStatement")
         self.indentation += 1
         self.writeKeyword("let")
-        self.writeIdentifier(self.tokenizer.identifier())
+        self.writeIdentifier(self.tokenizer.identifier(), "??", "??", "used")
         if self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == "[":
             self.writeSymbol("[")
             self.compileExpression()
@@ -201,7 +191,7 @@ class CompilationEngine:
         elif self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["true", "false", "null", "this"]:
             self.writeKeyword(self.tokenizer.keyword())
         elif self.tokenizer.tokenType() == "IDENTIFIER":
-            self.writeIdentifier(self.tokenizer.identifier())
+            self.writeIdentifier(self.tokenizer.identifier(), "??", "??", "used")
             if self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == "[":
                 self.writeSymbol("[")
                 self.compileExpression()
@@ -219,9 +209,10 @@ class CompilationEngine:
         self.writeTag("/term")
     
     def compileSubroutineCall(self):
+        # self.writeIdentifier(self.tokenizer.identifier(), "subroutine", 0, "used") # subroutine name, used. But there remain confusion, if it is current class's method, this first identifier is subroutine name, if it is other class's method, this first identifier is class name; later we should handle this problem
         if self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ".":
             self.writeSymbol(".")
-            self.writeIdentifier(self.tokenizer.identifier())
+            self.writeIdentifier(self.tokenizer.identifier(), "subroutine", 0, "used") # subroutine name, index is important, usage is important
         self.writeSymbol("(")
         self.compileExpressionList()
         self.writeSymbol(")")
@@ -248,8 +239,9 @@ class CompilationEngine:
         self.output_file.write("  " * self.indentation + "<symbol> " + symbol + " </symbol>\n")
         self.tokenizer.advance()
     
-    def writeIdentifier(self, identifier):
-        self.output_file.write("  " * self.indentation + "<identifier> " + str(identifier) + " </identifier>\n")
+    def writeIdentifier(self, identifier, category, index, usage):
+        attributes = "category=\"" + category + "\" index=\"" + str(index) + "\" usage=\"" + usage + "\""
+        self.output_file.write("  " * self.indentation + "<identifier" + attributes + "> " + str(identifier) + " </identifier>\n")
         self.tokenizer.advance()
 
     def writeIntegerConstant(self, integerConstant):
@@ -259,9 +251,3 @@ class CompilationEngine:
     def writeStringConstant(self, stringConstant):
         self.output_file.write("  " * self.indentation + "<stringConstant> " + stringConstant + " </stringConstant>\n")
         self.tokenizer.advance()
-
-    def close(self):
-        self.output_file.close()
-
-    
-
