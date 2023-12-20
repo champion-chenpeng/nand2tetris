@@ -1,4 +1,4 @@
-import JackTokenizer, VMWriter, SymbolTable, sys, os
+import JackTokenizer, VMWriter, SymbolTable
 class CompilationEngine:
     def __init__(self, input_file, output_file):
         self.className = ""
@@ -20,8 +20,6 @@ class CompilationEngine:
 
         self.keywordConstant = ["true", "false", "null", "this"]
         self.unaryOp = ["-", "~"]
-
-        self.osAPI = ["Keyboard", "Screen", "Memory", "Array", "Output", "Sys", "String", "Math"]
         
         self.compileClass()
         self.vm_writer.close()
@@ -39,17 +37,15 @@ class CompilationEngine:
         index = self.symbol_table.indexOf(name)
         self.vm_writer.writePush(kind.lower(), index)
     
-    def compileVarDec(self, isParameter=False, isConstructor=False):
+    def compileVarDec(self, isParameter=False, isMethod=False):
         kind = "arg" if isParameter else self.tokenizer.keyword() # static or field or var
         kind = kind.upper()
         if not isParameter:
             self.tokenizer.advance() # skip static or field or var
         
         # add "this" to arg list
-        if isParameter:
+        if isParameter and isMethod:
             self.symbol_table.define("this", self.className, "ARG")
-            self.vm_writer.writeComment(str(self.symbol_table.classScope))
-            self.vm_writer.writeComment(str(self.symbol_table.subroutineScope))
 
         if self.tokenizer.tokenType() != "SYMBOL": # exclude parameter list void case, following ")"
             type = self.tokenizer.keyword() if self.tokenizer.tokenType() == "KEYWORD" else self.tokenizer.identifier()
@@ -57,8 +53,7 @@ class CompilationEngine:
             name = self.tokenizer.identifier()
             self.tokenizer.advance() # skip name
             self.symbol_table.define(name, type, kind)
-            self.vm_writer.writeComment(str(self.symbol_table.classScope))
-            self.vm_writer.writeComment(str(self.symbol_table.subroutineScope))
+
             while self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ",":
                 self.tokenizer.advance() # skip ","
                 if isParameter: # not empty parameter list, if empty, next token is ")", a symbol
@@ -67,8 +62,6 @@ class CompilationEngine:
                 name = self.tokenizer.identifier()
                 self.tokenizer.advance() # skip name
                 self.symbol_table.define(name, type, kind)
-                self.vm_writer.writeComment(str(self.symbol_table.classScope))
-                self.vm_writer.writeComment(str(self.symbol_table.subroutineScope))
         if not isParameter:
             self.tokenizer.advance() # skip ";"
         
@@ -77,8 +70,6 @@ class CompilationEngine:
         self.vm_writer.writePush("constant", nField)
         self.vm_writer.writeCall("Memory.alloc", 1)
         self.vm_writer.writePop("pointer", 0)
-        self.vm_writer.writePush("pointer", 0)
-        self.vm_writer.writePop("argument", 0) # do not store in THIS, since member object may be created in constructor, and THIS is not ready yet
 
     def compileClass(self):
         self.tokenizer.advance() # skip "class"
@@ -88,32 +79,33 @@ class CompilationEngine:
         while self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["static", "field"]:
             self.compileVarDec()
         while self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() in ["constructor", "function", "method"]:
-            self.compileSubroutine(self.tokenizer.keyword() == "constructor")
+            self.compileSubroutine()
         self.tokenizer.advance() # skip "}"
 
-    def compileSubroutine(self, isConstructor=False):
+    def compileSubroutine(self):
         self.symbol_table.reset()
 
+        function_type = self.tokenizer.keyword() # constructor or function or method
         self.tokenizer.advance() # skip "constructor" or "function" or "method"
         # returnType = self.tokenizer.keyword() # void or type
         self.tokenizer.advance() # skip void or type, the subroutine return type will be determined in subroutineBody
         name = self.tokenizer.identifier()
         self.tokenizer.advance() # skip subroutine name
         self.tokenizer.advance() # skip "("
-        self.compileVarDec(isParameter=True, isConstructor=isConstructor)
+        self.compileVarDec(isParameter=True, isMethod=(function_type == "method"))
         self.tokenizer.advance() # skip ")"
-        self.compileSubroutineBody(name, isConstructor)
+        self.compileSubroutineBody(name, function_type)
 
-    def compileSubroutineBody(self, name, isConstructor=False):
+    def compileSubroutineBody(self, name, function_type):
         self.tokenizer.advance() # skip "{"
         while self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() == "var":
             self.compileVarDec()
         self.vm_writer.writeFunction(self.className + "." + name, self.symbol_table.varCount("VAR"))
-        if self.className != "Main" and name != "main":
+        if function_type == "method":
             self.vm_writer.writePush("argument", 0) # push this
             self.vm_writer.writePop("pointer", 0) # pop this
         # the problem is this is used via FIELD, and this is not ready yet
-        if isConstructor:
+        if function_type == "constructor":
             self.compileConstructorInit()
         self.compileStatements()
         self.tokenizer.advance() # skip "}"
@@ -162,9 +154,6 @@ class CompilationEngine:
     def compileReturn(self):
         self.tokenizer.advance() # skip "return"
         if self.tokenizer.tokenType() != "SYMBOL" or self.tokenizer.symbol() != ";":
-            if self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() == "this":
-                self.vm_writer.writePush("argument", 0)
-                self.vm_writer.writePop("pointer", 0)
             self.compileExpression()
         else:
             self.vm_writer.writePush("constant", 0)
@@ -174,7 +163,7 @@ class CompilationEngine:
     def compileDo(self):
         self.tokenizer.advance() # skip "do"
         self.compileExpression()
-        self.vm_writer.writePop("temp", 0)
+        self.vm_writer.writePop("temp", 0) # clean the stack of the expression result
         self.tokenizer.advance() # skip ";"
 
     def compileIf(self):
@@ -289,9 +278,7 @@ class CompilationEngine:
 
     def compilePartialSubroutineCall(self, className, funcName, isMethod=False):
         self.tokenizer.advance() # skip "("
-        self.vm_writer.writeComment(str(self.symbol_table.classScope))
-        self.vm_writer.writeComment(str(self.symbol_table.subroutineScope))
-        self.vm_writer.writeComment(str(isMethod))
+
         NExpr = self.compileExpressionList() + int(isMethod)
         self.tokenizer.advance() # skip ")"
         self.vm_writer.writeCall(className + "." + funcName, NExpr)
@@ -299,24 +286,18 @@ class CompilationEngine:
 
     def compileSubroutineCall(self, name):
         if self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == "(": # current class method call
-            self.vm_writer.writePush("argument", 0) # push this
+            self.vm_writer.writePush("pointer", 0) # push this
             self.compilePartialSubroutineCall(self.className, name, isMethod=True)
         elif self.tokenizer.tokenType() == "SYMBOL" and self.tokenizer.symbol() == ".": # class or object call
             self.tokenizer.advance() # skip "."
             funcName = self.tokenizer.identifier()
             self.tokenizer.advance() # skip funcName
             
-            className = name 
             type = self.symbol_table.typeOf(name)
-            isMethod = False
-            if type: # if type, it's a object call, otherwise, it's a static call
+            isMethod = (type != None)
+            if isMethod: # if type, it's a object call, otherwise, it's a static call
                 self.writePushVar(name) # push object as this
-                className = type
-                isMethod = True
-            elif className not in self.osAPI: # class static call
-                self.vm_writer.writePush("constant", 0) # push 0 as this
-                isMethod = True
-            # else it is a External call, no need to pass this
+            className = type if isMethod else name
             self.compilePartialSubroutineCall(className, funcName, isMethod) # bool(type) == isMethod
 
     def compileVarName(self):

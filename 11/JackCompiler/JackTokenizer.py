@@ -87,8 +87,46 @@ class JackTokenizer:
             return self.currentTokenValue
         else:
             raise TypeError("Error: current token is not a string: /n" + str(self.currentToken))
+    
+    def tokenizeLine(self, line):
+        # help split symbols
+        for symbol in self.list_symbol:
+            line = line.replace(symbol, " " + symbol + " ")
+        
+        brokenStrTokens = line.split()
+        isString = False
+        currentString = ""
+        rawTokens = []
+        for token in brokenStrTokens:
+            if not isString and token.startswith("\""):
+                isString = True
+                currentString = token
+            elif isString and token.endswith("\""):
+                isString = False
+                currentString += " " + token
+                rawTokens.append(currentString)
+            elif isString and "\"" not in token:
+                currentString += " " + token
+            else:
+                rawTokens.append(token)
+        return rawTokens
+    
+    def storeTokens(self, rawTokens):
+        for token in rawTokens:
+            if token in self.dict_keyword:
+                self.tokens.append(["KEYWORD", token])
+            elif token in self.list_symbol:
+                if token in self.escape_symbol:
+                    token = self.escape_symbol[token]
+                self.tokens.append(["SYMBOL", token])
+            elif token.isdigit():
+                self.tokens.append(["INTEGER_CONSTANT", token])
+            elif len(token) >= 2 and token.startswith("\"") and token.endswith("\""):
+                self.tokens.append(["STRING_CONSTANT", token[1:-1]])
+            else:
+                self.tokens.append(["IDENTIFIER", token])
 
-    def tokenizer(self):
+    def tokenizer(self): # comment skip mainly
         with open(self.file, "r") as f:
             lines = f.readlines()
             isComment = False
@@ -102,37 +140,10 @@ class JackTokenizer:
                     continue
                 else:
                     line = line.split("//")[0].strip()
-                    for symbol in self.list_symbol:
-                        line = line.replace(symbol, " " + symbol + " ")
-                    line = line.split()
                     
-                    isString = False
-                    currentString = ""
-                    rawTokens = []
-                    for token in line:
-                        if not isString and token.startswith("\""):
-                            isString = True
-                            currentString = token
-                        elif isString and token.endswith("\""):
-                            isString = False
-                            currentString += " " + token
-                            rawTokens.append(currentString)
-                        elif isString and "\"" not in token:
-                            currentString += " " + token
-                        else:
-                            rawTokens.append(token)
-                    for token in rawTokens:
-                        if token in self.dict_keyword:
-                            self.tokens.append(["KEYWORD", token])
-                        elif token in self.list_symbol:
-                            if token in self.escape_symbol:
-                                token = self.escape_symbol[token]
-                            self.tokens.append(["SYMBOL", token])
-                        elif token.isdigit():
-                            self.tokens.append(["INTEGER_CONSTANT", token])
-                        elif len(token) >= 2 and token.startswith("\"") and token.endswith("\""):
-                            self.tokens.append(["STRING_CONSTANT", token[1:-1]])
-                        else:
-                            self.tokens.append(["IDENTIFIER", token])
+                    rawTokens = self.tokenizeLine(line)
+                    self.storeTokens(rawTokens)
+                    
+                    
         # print(self.tokens)
 
