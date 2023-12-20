@@ -11,16 +11,18 @@ class SymbolTable:
         self.TYPE = 0
         self.KIND = 1
         self.INDEX = 2
+
+        self.label_dict = {
+            "IF": 0,
+            "WHILE": 0
+        }
     
     def reset(self):
-        self.classScope = {}
         self.subroutineScope = {}
-        self.index_dict = {
-            "STATIC": 0,
-            "FIELD": 0,
-            "ARG": 0,
-            "VAR": 0
-        }
+        for key in ["ARG", "VAR"]:
+            self.index_dict[key] = 0
+        for key in self.label_dict:
+            self.label_dict[key] = 0
         
     def define(self, name, type, kind):
         if kind == "STATIC" or kind == "FIELD":
