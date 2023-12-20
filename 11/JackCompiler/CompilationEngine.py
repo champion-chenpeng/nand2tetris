@@ -171,26 +171,26 @@ class CompilationEngine:
         labelIndex = self.symbol_table.label_dict[controlName]
         self.symbol_table.label_dict[controlName] += 1
         labelName = controlName + str(labelIndex)
-        label1 = labelName + "_ELSE"
-        label2 = labelName + "_END"
+        label_else = labelName + "_ELSE"
+        label_end = labelName + "_END"
 
         self.tokenizer.advance() # skip "if"
         self.tokenizer.advance() # skip "("
         self.compileExpression()
         self.tokenizer.advance() # skip ")"
         self.vm_writer.writeArithmetic("not")
-        self.vm_writer.writeIf(label1)# if goto L1
+        self.vm_writer.writeIf(label_else)
         self.tokenizer.advance() # skip "{"
         self.compileStatements()
         self.tokenizer.advance() # skip "}"
-        self.vm_writer.writeGoto(label2) # goto L2
-        self.vm_writer.writeLabel(label1) # label L1
+        self.vm_writer.writeGoto(label_end) 
+        self.vm_writer.writeLabel(label_else) 
         if self.tokenizer.tokenType() == "KEYWORD" and self.tokenizer.keyword() == "else":
             self.tokenizer.advance() # skip "else"
             self.tokenizer.advance() # skip "{"
             self.compileStatements()
             self.tokenizer.advance() # skip "}"
-        self.vm_writer.writeLabel(label2) # label L2
+        self.vm_writer.writeLabel(label_end) 
 
         
 
@@ -199,21 +199,21 @@ class CompilationEngine:
         labelIndex = self.symbol_table.label_dict[controlName]
         self.symbol_table.label_dict[controlName] += 1
         labelName = controlName + str(labelIndex)
-        label1 = labelName + "_BEGIN"
-        label2 = labelName + "_END"
+        label_begin = labelName + "_BEGIN"
+        label_end = labelName + "_END"
 
         self.tokenizer.advance() # skip "while"
         self.tokenizer.advance() # skip "("
-        self.vm_writer.writeLabel(label1) # label L1
+        self.vm_writer.writeLabel(label_begin)
         self.compileExpression()
         self.tokenizer.advance() # skip ")"
         self.vm_writer.writeArithmetic("not")
-        self.vm_writer.writeIf(label2) # if goto L2
+        self.vm_writer.writeIf(label_end) # 
         self.tokenizer.advance() # skip "{"
         self.compileStatements()
         self.tokenizer.advance() # skip "}"
-        self.vm_writer.writeGoto(label1) # goto L1
-        self.vm_writer.writeLabel(label2) # label L2
+        self.vm_writer.writeGoto(label_begin) 
+        self.vm_writer.writeLabel(label_end) 
         
 
     def compileExpressionList(self): # used in subrouteCall, so ExpressionList == parameterList
@@ -254,8 +254,8 @@ class CompilationEngine:
 
     def compileKeywordConstant(self):
         if self.tokenizer.keyword() == "true":
-            self.vm_writer.writePush("constant", 1)
-            self.vm_writer.writeArithmetic("neg")
+            self.vm_writer.writePush("constant", 0)
+            self.vm_writer.writeArithmetic("not")
         elif self.tokenizer.keyword() == "false" or self.tokenizer.keyword() == "null":
             self.vm_writer.writePush("constant", 0)
         elif self.tokenizer.keyword() == "this":
