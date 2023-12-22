@@ -7,4 +7,7 @@ This is the course project of nand2tetris, a general Computer Architecture cours
 
 ## more
 1. using .hdl to simulate CPU?
-- .jack -> .hack -> Hardware Simulator(.hdl) 
+- .jack -> .hack -> Hardware Simulator(.hdl)
+  - find some bug:
+    - when compiling Seven/ with all 8 OS API, there appears 17 bit instruction in result .hack
+    - when exclude Keyboard.jack and Sys.jack, the .hack looks good
