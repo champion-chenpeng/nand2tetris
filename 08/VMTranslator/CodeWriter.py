@@ -117,7 +117,10 @@ class CodeWriter:
             if command in self.list_compare:
                 self.writeCompare(command)
             else:
-                self.writter.write("D=M" + self.dict_op[command] + "D\n")
+                if command == "sub":
+                    self.writter.write("D=M" + self.dict_op[command] + "D\n")
+                else:
+                    self.writter.write("D=D" + self.dict_op[command] + "M\n") 
 
     def writeArithmetic(self, command):
         self.writeGetArgs(command) # D = y, M = x
