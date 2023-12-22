@@ -22,6 +22,7 @@ class Memory {
         let freeListEnd = 16384;
         let freeList[0] = freeListEnd; // end of free list
         let freeList[1] = freeListEnd - freeList - 2; // size of free list
+        return;
     }
 
     /** Returns the RAM value at the given address. */
@@ -32,6 +33,7 @@ class Memory {
     /** Sets the RAM value at the given address to the given value. */
     function void poke(int address, int value) {
         let ram[address] = value;
+        return;
     }
 
     /** Finds an available RAM block of the given size and returns
@@ -41,7 +43,7 @@ class Memory {
         let p = freeList;
         // first possible segment
         while (p[1] < (size + 2)) {
-            p = p[0];
+            let p = p[0];
             // if p = end of free list, no suitable segment was found, but we currently not handling this case
         }
         // update current segment
@@ -59,7 +61,7 @@ class Memory {
         let p = freeList;
         // find the last segment
         while (~(p[0] = freeListEnd)) {
-            p = p[0];
+            let p = p[0];
         }
         // update last segment
         let p[0] = o - 2;
@@ -67,5 +69,6 @@ class Memory {
         // update current segment
         let p[0] = freeListEnd;
         // we can also use o[-2] = freeListEnd, but it is wired
+        return;
     }    
 }

@@ -223,8 +223,11 @@ class Output {
             let bit = 1;
             while (j < 8) { // 6 is enough, since the first 2 bits are always 0 for padding
                 if (map[i] & bit) {
-                    do Screen.drawPixel(cursorCol * 8 + j, cursorRow * 11 + i);
+                    do Screen.setColor(true);
+                } else {
+                    do Screen.setColor(false);
                 }
+                do Screen.drawPixel(cursorCol * 8 + j, cursorRow * 11 + i);
                 let j = j + 1;
                 let bit = bit * 2;
             }
