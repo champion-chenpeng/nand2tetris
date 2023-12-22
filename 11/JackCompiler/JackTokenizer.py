@@ -94,14 +94,16 @@ class JackTokenizer:
             line = line.replace(symbol, " " + symbol + " ")
         
         brokenStrTokens = line.split()
+        print("brokenStrTokens: ")
+        print(brokenStrTokens)
         isString = False
         currentString = ""
         rawTokens = []
         for token in brokenStrTokens:
-            if not isString and token.startswith("\""):
+            if not isString and token.startswith("\"") and not token.endswith("\""):
                 isString = True
                 currentString = token
-            elif isString and token.endswith("\""):
+            elif isString and token.endswith("\"") and not token.startswith("\""):
                 isString = False
                 currentString += " " + token
                 rawTokens.append(currentString)
@@ -109,6 +111,8 @@ class JackTokenizer:
                 currentString += " " + token
             else:
                 rawTokens.append(token)
+        print("rawTokens: ")
+        print(rawTokens)
         return rawTokens
     
     def storeTokens(self, rawTokens):
